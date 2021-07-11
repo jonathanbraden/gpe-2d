@@ -174,5 +174,47 @@ contains
     this%psi(:,0,:) = this%psi(:,n,:); this%psi(:,n+1,:) = this%psi(:,1,:)
 #endif
   end subroutine wrap_field
+
+  ! This computes the filter every time
+  ! Alternatively, I could precompute a logical array at the start and then just use it here with a where statement
+  subroutine project_high_k(this,ncut)
+    type(Lattice), intent(inout) :: this
+    integer, intent(in) :: ncut
+    
+    integer :: l, i,j,jj,icut
+    integer :: n, nn
+
+    n = this%nLat; nn = n/2+1
+
+    do l=1,this%nFld
+       this%tPair%realSpace = this%psi(1:n,1:n,l)
+       call forward_transform_2d_wtype_c(this%tPair)
+       do j=1,n; if (j<=nn) then; jj = j-1; else; jj = n+1-j; endif
+          icut = floor( sqrt(dble(jj**2-ncut**2)) ) + 1 ! Fix indexing here
+          do i=icut,nn ! Add negative frequencies (n+1-icut?)
+             this%tPair%specSpace(i,j) = 0._dl
+          enddo
+       enddo
+       call backward_transform_2d_wtype_c(this%tPair)
+       this%psi(1:n,1:n,j) = this%tPair%specSpace(:,:)/dble(n)**2
+    enddo
+  end subroutine project_high_k
+
+  subroutine apply_projection(this,filter)
+    type(Lattice), intent(inout) :: this
+    logical, dimension(this%nlat,this%nlat), intent(in) :: filter
+
+    integer :: l, n
+
+    n = this%nLat
+    do l=1,this%nFld
+       this%tPair%realSpace = this%psi(1:n,1:n,l)
+       call forward_transform_2d_wtype_c(this%tPair)
+       ! Hit with the filter (debug this)
+       ! where (filter) this%tPair%specSpace = 0._dl
+       call backward_transform_2d_wtype_c(this%tPair)
+       this%psi(1:n,1:n,l) = this%tPair%realSpace(1:n,1:n)/dble(n)**2
+    enddo
+  end subroutine apply_projection
   
 end module Simulation

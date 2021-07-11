@@ -10,6 +10,7 @@ module Hamiltonian
 
   integer, parameter :: n_Hamiltonian_terms = 2
   integer, parameter :: nPar = 1
+  real(dl) :: mu1, mu2
   real(dl) :: lam = 1.2_dl
   real(dl) :: mu = 1._dl
   
@@ -21,6 +22,16 @@ contains
     mu = 0._dl  ! Compute mu using the RMS of the fields
   end subroutine set_model_params
 
+  !>@brief
+  !> Compute chemical potential using variance of underlying fields
+  subroutine compute_chem_pot(this)
+    type(Lattice), intent(in) :: this
+
+    mu = sum(abs(this%psi)**2)/dble(size(this%psi))
+    mu1 = sum(abs(this%psi(:,:,1)**2))/dble(this%nLat)**2
+    mu2 = sum(abs(this%psi(:,:,2)**2))/dble(this%nLat)**2
+  end subroutine compute_chem_pot
+  
   subroutine write_model_header(fNum)
     integer, intent(in) :: fNum
     logical :: o
@@ -38,7 +49,7 @@ contains
 
     select case (term)
     case (1)
-       call Hamiltonian_linear(this,dt)
+       call Hamiltonian_kinetic(this,dt)
     case (2)
        call Hamiltonian_nonlinear(this,dt)
     case default
@@ -63,7 +74,7 @@ contains
     call Hamiltonian_Split(this,0.5_dl*(w1+w2)*dt,1)
   end subroutine symp_o2_step
 
-  subroutine Hamiltonian_linear(this,dt)
+  subroutine Hamiltonian_kinetic(this,dt)
     type(Lattice), intent(inout) :: this
     real(dl), intent(in) :: dt
 
@@ -78,7 +89,7 @@ contains
     do l=1,this%nFld
        this%tPair%realSpace(1:n,1:n) = this%psi(1:n,1:n,l)
        call forward_transform_2d_wtype_c(this%tPair)
-       do j=1,this%n; if (j<=nn) then; jj = j-1; else; jj = n+1-j; endif
+       do j=1,n; if (j<=nn) then; jj = j-1; else; jj = n+1-j; endif
           do i=1,nn
              rad2 = dble(jj**2+(i-1)**2)*dk**2
              this%tPair%specSpace = norm*exp(-iImag*rad2*dt)*this%tPair%specSpace
@@ -95,7 +106,7 @@ contains
     call wrap_field(this)
     ! Write this
 #endif
-  end subroutine Hamiltonian_linear
+  end subroutine Hamiltonian_kinetic
 
   !>@brief
   !>

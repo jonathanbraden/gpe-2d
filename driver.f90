@@ -21,12 +21,14 @@ program gpe_2d
   
   integer :: u1, u2
   
-  call create_lattice(mySim,128,1._dl,2)
+  call create_lattice(mySim,4,1._dl,2)
   
   call initialize_rand(42,1315)
   open(unit=newunit(u1),file='field.dat',access='stream',status='replace')
   open(unit=newunit(u2),file='dfield.dat',access='stream',status='replace')
-  
+
+  mySim%psi(:,:,1) = 1./2.**0.5
+  mySim%psi(:,:,2) = 1./2.**0.5*iImag
   
 contains
 
