@@ -1,4 +1,7 @@
 #include "macros.h"
+!
+! Currently solves decoupled nonlinear Schrodinger equations
+!
 module Hamiltonian
   use constants, only : dl, twopi
   use fftw3_cmplx
@@ -15,7 +18,7 @@ contains
   subroutine set_model_params(par)
     real(dl), dimension(1:nPar), intent(in) :: par
     lam = par(1)
-    mu = 0._dl
+    mu = 0._dl  ! Compute mu using the RMS of the fields
   end subroutine set_model_params
 
   subroutine write_model_header(fNum)
@@ -64,14 +67,29 @@ contains
     type(Lattice), intent(inout) :: this
     real(dl), intent(in) :: dt
 
-    integer :: n, j
+    integer :: n,nn, l, i,j,jj
+    real(dl) :: norm, dk, rad2
 
-    n = this%nLat
+    ! In here, it will probably be more convenient to replace the inner loop with precomputed kx2 values
+    n = this%nLat; nn = n/2+1
+    norm = 1._dl/dble(n)**2
+    dk = this%dk
 #ifdef SPECTRAL
-    do j=1,this%nFld
-       this%tPair%realSpace(1:n,1:n) = this%psi(1:n,1:n,j)
-       call laplacian_2d_wtype_c(this%tPair,this%dk)
-       this%psi(1:n,1:n,j) = this%psi(1:n,1:n,j) + dt*iImag*this%tPair%realSpace(1:n,1:n)
+    do l=1,this%nFld
+       this%tPair%realSpace(1:n,1:n) = this%psi(1:n,1:n,l)
+       call forward_transform_2d_wtype_c(this%tPair)
+       do j=1,this%n; if (j<=nn) then; jj = j-1; else; jj = n+1-j; endif
+          do i=1,nn
+             rad2 = dble(jj**2+(i-1)**2)*dk**2
+             this%tPair%specSpace = norm*exp(-iImag*rad2*dt)*this%tPair%specSpace
+          enddo
+          do i=nn+1,n
+             rad2 = dble(jj**2+(n+1-i)**2)*dk**2
+             this%tPair%specSpace = norm*exp(-iImag*rad2*dt)*this%tPair%specSpace
+          enddo
+       enddo
+       call backward_transform_2d_wtype_c(this%tPair)
+       this%psi(1:n,1:n,l) = this%tPair%realSpace(1:n,1:n)
     enddo
 #else
     call wrap_field(this)
@@ -79,11 +97,19 @@ contains
 #endif
   end subroutine Hamiltonian_linear
 
+  !>@brief
+  !>
+  !> Solves df = -i|f|^2f
   subroutine Hamiltonian_nonlinear(this,dt)
     type(Lattice), intent(inout) :: this
     real(dl), intent(in) :: dt
 
-    
+    integer :: j
+
+    do j=1,this%nFld
+       ! This is probably the place to include the chem pot associated with |psi|^2
+       this%psi(:,:,j) = exp(-iImag*(abs(this%psi(:,:,j))**2-mu)*dt)*this%psi(:,:,j)
+    enddo
   end subroutine Hamiltonian_nonlinear
   
 end module Hamiltonian
