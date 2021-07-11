@@ -80,11 +80,15 @@ contains
 
     integer :: n,nn, l, i,j,jj
     real(dl) :: norm, dk, rad2
-
+    integer, dimension(1:this%nLat) :: n_x
+    
     ! In here, it will probably be more convenient to replace the inner loop with precomputed kx2 values
     n = this%nLat; nn = n/2+1
     norm = 1._dl/dble(n)**2
     dk = this%dk
+
+    do i=1,nn; n_x(i) = i-1; enddo; do i=nn+1,n; n_x(i) = n+1-i; enddo ! Precomputed for now.  Try using this to vectorize the inner loop below
+
 #ifdef SPECTRAL
     do l=1,this%nFld
        this%tPair%realSpace(1:n,1:n) = this%psi(1:n,1:n,l)
@@ -92,11 +96,11 @@ contains
        do j=1,n; if (j<=nn) then; jj = j-1; else; jj = n+1-j; endif
           do i=1,nn
              rad2 = dble(jj**2+(i-1)**2)*dk**2
-             this%tPair%specSpace = norm*exp(-iImag*rad2*dt)*this%tPair%specSpace
+             this%tPair%specSpace = norm*exp(-0.5_dl*iImag*rad2*dt)*this%tPair%specSpace
           enddo
           do i=nn+1,n
              rad2 = dble(jj**2+(n+1-i)**2)*dk**2
-             this%tPair%specSpace = norm*exp(-iImag*rad2*dt)*this%tPair%specSpace
+             this%tPair%specSpace = norm*exp(-0.5_dl*iImag*rad2*dt)*this%tPair%specSpace
           enddo
        enddo
        call backward_transform_2d_wtype_c(this%tPair)
