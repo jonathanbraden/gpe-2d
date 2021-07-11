@@ -30,3 +30,15 @@
 *.exe
 *.out
 *.app
+
+# Python bytecode
+*.pyc
+
+# PDFs and PNGs
+*.pdf
+*.png
+
+# Data files
+*.bin
+*.dat
+*.out
